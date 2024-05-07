@@ -1,0 +1,97 @@
+---
+title: "OneSite_StormSelection"
+author: "Marc Peipoch"
+date: '2023-01-24'
+output: html_document
+---
+
+For the selected storms in OneSite_StormSelection.rmd, here I calculate the additional metrics 
+
+1) Calculate Chl export
+2) calculate the total increase in [chl] concentration 
+3) calculate the C-Q slope and p-value
+4) calculate CVc/CVq
+5) link them to each storm ID event
+```{r}
+####################parameters to adjust
+site = "TOMB"
+year = "2021"
+parameter="Chlorophyll_"
+selected_storms = paste0('storm_',c(3))
+###########################################
+
+cQ_file = "chl_AllCQData.csv"
+hyst_file= "chl_HysteresisData.csv"
+####################parameters to adjust
+
+
+setwd(paste("/Users/marc_peipoch/Documents/DataInDevelopment/NEONData/",site,"/04_product/",parameter,year,sep=""))
+
+AllCQData = read.csv(cQ_file, header = T)
+ 
+
+#calculate the export for chlorophyll per event
+exportChl = AllCQData %>%
+  group_by(storm_id) %>%
+  mutate(risignChlexport = conc*(q_cms*1000)*(60*30)) %>% #in ug Chl every 30min
+  summarize(totalChlexport = sum(risignChlexport)/1000000) #in g Chl per event
+
+AllCQData_v2 = left_join(AllCQData,exportChl,by="storm_id")
+
+#calculate the differential increase/decrease in Chl concentration per storm event 
+increaseChl = AllCQData %>%
+  group_by(storm_id) %>%
+  slice(1:which.max(conc)) %>%
+  summarize(deltaChl = max(conc) - min(conc)) 
+
+AllCQData_v3 = left_join(AllCQData_v2,increaseChl,by="storm_id")
+
+#calculate the the C-Q slope
+CQslope = AllCQData %>%
+  group_by(storm_id) %>%
+  do(slope = as.numeric(coef(lm(log(conc+0.01) ~ log(q_cms),data=.))[2]))
+
+CQslope = as.data.frame(CQslope)
+AllCQData_v4 = left_join(AllCQData_v3,CQslope,by="storm_id")
+
+#calculate the the C-Q slope significance
+CQslopesig = AllCQData %>%
+  group_by(storm_id) %>%
+  do(model_output = summary(lm(log(conc+0.01) ~ log(q_cms),data=.))) %>%
+  summarize(CQslopesig = as.numeric(model_output$coefficients[2,4]))
+
+CQslopesig = as.data.frame(cbind(CQslope$storm_id,CQslopesig))
+colnames(CQslopesig) = c("storm_id", "CQslopesig")
+AllCQData_v5 = left_join(AllCQData_v4,CQslopesig,by="storm_id")
+
+#calculate the  CV of concentration and discharge
+CQcvs = AllCQData %>%
+  group_by(storm_id) %>%
+  summarize(Conc_cv = sd(conc) / mean(conc),
+            Disch_cv = sd(q_cms) / mean(q_cms)) 
+
+AllCQData_v6 = left_join(AllCQData_v5,CQcvs,by="storm_id")
+
+#first extract the unique set of dates we need 
+
+subset_CQData = AllCQData_v6 %>%
+  filter(., storm_id %in% selected_storms) %>%
+  mutate(start=datetime) %>%
+  dplyr::select(start,totalChlexport,deltaChl,slope,CQslopesig,Conc_cv,Disch_cv) 
+    
+    
+#input hysteresis indices results and join by the selected dates
+
+AllHysteresisData = read.csv(hyst_file, header = T)
+
+
+temp = left_join(subset_CQData,AllHysteresisData,by="start")
+temp = temp[!is.na(temp$storm_id),]
+temp = apply(temp,2,as.character)
+
+file.path = "/Users/marc_peipoch/Documents/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/Chlorophyll_export&calcs/"
+write.csv(temp,file = file.path(file.path,paste(site,year,parameter,"Results.csv",sep="_")))
+
+print(selected_storms)
+
+```

@@ -1,0 +1,88 @@
+---
+title: "One Site Water Quality Data Collection"
+author: "Marc Peipoch"
+date: "9/16/2022"
+output: html_document
+---
+
+Stack downloaded data files into single .zip file
+```{r setup, include=FALSE}
+library(neonUtilities) ; library(dplyr) ; library(lubridate)
+options(stringsAsFactors=F) # character variables are not converted to factors
+
+setwd("R:/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/ARIK/01_input")
+
+dpID = "DP1.20288.001" #for water quality
+#In situ sensor-based specific conductivity, concentration of chlorophyll a, dissolved oxygen content, fDOM concentration, pH, and turbidity, available as one- or five-minute instantaneous measurements in surface water of lakes, wadeable streams, and non-wadeable streams
+  #data product ID will need to be checked online for each parameter
+
+site = "ARIK"
+  #Will do one site at a time, so we can evaluate QAQC more accurately 
+pack = "expanded"
+  #Always expanded, includes quality metrics for all of the quality assessment and quality control analyses.
+startdate = "2017-01" ; enddate = "2022-09"
+
+memory.limit(size=50000) #to set a higher value fpr memory use limit
+
+watqual <- loadByProduct(dpID, site, package=pack, startdate, enddate, check.size=FALSE) #returns a list with all data frames
+list2env(watqual, .GlobalEnv) #extract each list object into the environment (don't do this if working with multiple sites)
+
+#######save the files to SWRC server########
+write.csv(ais_maintenance, 
+          "ais_maintenance.csv", 
+          row.names=F)
+
+write.csv(ais_multisondeCleanCal, 
+          "ais_multisondeCleanCal.csv", 
+          row.names=F)
+
+write.csv(issueLog_20288, 
+          "issueLog_20288.csv", 
+          row.names=F)
+
+write.csv(readme_20288, 
+          "readme_20288.csv", 
+          row.names=F)
+
+write.csv(sensor_positions_20288, 
+          "sensor_positions_20288.csv", 
+          row.names=F)
+
+write.csv(variables_20288, 
+          "variables_20288.csv", 
+          row.names=F)
+############################################################################################################################
+#"waq_instantaneous" file contains the actual data and can be extremely large for some sites, isolate parameters before downloading
+#This is a long file, it will crash most of the times
+        
+#################Split waq_instantaneous file into multiple years
+
+wq_data = waq_instantaneous %>%
+  select(startDateTime, 
+         sensorDepth, sensorDepthExpUncert, sensorDepthFinalQF, sensorDepthFinalQFSciRvw,
+         dissolvedOxygen, dissolvedOxygenExpUncert, dissolvedOxygenFinalQF, dissolvedOxygenFinalQFSciRvw, 
+         localDissolvedOxygenSat, localDOSatExpUncert, localDOSatFinalQF, localDOSatFinalQFSciRvw,
+         chlorophyll, chlorophyllExpUncert, chlorophyllFinalQF, chlorophyllFinalQFSciRvw,
+         turbidity, turbidityExpUncert, turbidityFinalQF, turbidityFinalQFSciRvw) %>%
+  filter(chlorophyllFinalQF == 0 & turbidityFinalQF == 0) %>% #filter by chl and turbidity values of acceptable quality
+  mutate(datetime = as.POSIXct(startDateTime, format = "%m/%d/%Y %H:%M:%S"),
+          year = year(datetime))
+
+years = list(2017,2018,2019,2020,2021,2022)
+
+for (i in 1:6){
+  
+     temp_d = subset(wq_data, year==years[i])
+      write.csv(temp_d,paste("wq_data_QApass_",years[i],".csv",sep=""))
+       
+} 
+###################################################################################################
+###################################################################################################
+###################################################################################################
+#note all these datasets do not have a continuous datetime vector, there are breaks that are not filled with NA observations
+
+
+
+```
+
+

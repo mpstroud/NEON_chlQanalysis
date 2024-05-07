@@ -1,0 +1,122 @@
+---
+title: "OneSite_StormSelection"
+author: "Marc Peipoch"
+date: '2023-01-24'
+output: html_document
+---
+
+This code allows visual inspection of the c-Q relationships for each selected storm. I wrote down the storm_ID of those showing clear
+patterns of hysteresis loops and validated they were indeed storm vents (signifcant increase in Q) by axomining the cha_AllCQData file when necessary
+```{r setup, include=FALSE}
+library(ggplot2) ; library(dplyr) ; library(scales)
+
+site="LEWI"
+
+setwd(paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/",site,"/04_product",sep=""))
+Storms_2017 = read.csv("Chlorophyll_2017/chl_AllCQData.csv", header = T)
+Storms_2018 = read.csv("Chlorophyll_2018/chl_AllCQData.csv", header = T)
+Storms_2019 = read.csv("Chlorophyll_2019/chl_AllCQData.csv", header = T)
+Storms_2020 = read.csv("Chlorophyll_2020/chl_AllCQData.csv", header = T)
+Storms_2021 = read.csv("Chlorophyll_2021/chl_AllCQData.csv", header = T)
+Storms_2022 = read.csv("Chlorophyll_2022/chl_AllCQData.csv", header = T)
+
+```
+```{r}
+plot_data = Storms_2020
+
+
+storm_numb = unique(plot_data$storm_id)
+plot_results = list()
+  
+for (i in 1:length(storm_numb)) {
+  plot_subdata = subset(plot_data, storm_id==storm_numb[i])
+  print(ggplot(plot_subdata, aes(q_cms, conc, colour=time_step, size=1)) + 
+  geom_point() + scale_colour_gradient(low = "yellow", high = "red")
+ + ggtitle(print(storm_numb[i])))
+  
+}
+
+
+```
+
+This code corrects the mismatch in storm_IDs between chl_HysteresisData and cha_AllCQData files. The dates and storm_ID in the cha_AllCQData files are the ones that matched the raw data and the ones I used above for visual inspection. Therefore, the following code will use the datetime per storm_ID from the the cha_AllCQData file to then subset the selected events in chl_HysteresisData using the datetime factor, and not the storm_ID
+```{r}
+####################parameters to adjust
+site = "BLUE"
+year = "2020"
+selected_storms = paste0('storm_',c(10,9,6,4))
+###########################################
+
+
+
+
+
+
+parameter="Chlorophyll_"
+cQ_file = "chl_AllCQData.csv"
+hyst_file= "chl_HysteresisData.csv"
+####################parameters to adjust
+
+
+
+setwd(paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/",site,"/04_product/",parameter,year,sep=""))
+
+AllCQData = read.csv(cQ_file, header = T)
+ 
+
+
+#first extract the unique set of dates we need 
+
+subset_CQData = AllCQData %>%
+  filter(., storm_id %in% selected_storms) %>%
+  mutate(start=datetime) %>%
+  dplyr::select(start) 
+    
+    
+#input hysteresis indices results and join by the selected dates
+
+AllHysteresisData = read.csv(hyst_file, header = T)
+
+
+temp = left_join(subset_CQData,AllHysteresisData,by="start")
+temp = temp[!is.na(temp$storm_id),]
+
+file.path = "/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/"
+write.csv(temp,file = file.path(file.path,paste(site,year,parameter,"Results.csv",sep="_")))
+
+
+
+
+parameter="Turbidity_"
+cQ_file = "turb_AllCQData.csv"
+hyst_file= "turb_HysteresisData.csv"
+####################parameters to adjust
+
+
+
+setwd(paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/",site,"/04_product/",parameter,year,sep=""))
+
+AllCQData = read.csv(cQ_file, header = T)
+ 
+
+
+#first extract the unique set of dates we need 
+
+subset_CQData = AllCQData %>%
+  filter(., storm_id %in% selected_storms) %>%
+  mutate(start=datetime) %>%
+   dplyr::select(start) 
+    
+    
+#input hysteresis indices results and join by the selected dates
+
+AllHysteresisData = read.csv(hyst_file, header = T)
+
+
+temp = left_join(subset_CQData,AllHysteresisData,by="start")
+temp = temp[!is.na(temp$storm_id),]
+
+file.path = "/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/"
+write.csv(temp,file = file.path(file.path,paste(site,year,parameter,"Results.csv",sep="_")))
+
+```

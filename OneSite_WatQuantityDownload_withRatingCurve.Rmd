@@ -1,0 +1,111 @@
+---
+title: "One Site Water Quality Data Collection"
+author: "Marc Peipoch"
+date: "9/16/2022"
+output: html_document
+---
+
+Stack downloaded data files into single .zip file
+```{r setup, include=FALSE}
+library(neonUtilities) ; library(dplyr) ; library(lubridate) ; library(ggplot2) 
+options(stringsAsFactors=F) # character variables are not converted to factors
+
+setwd("R:/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/ARIK/01_input")
+
+dpID = "DP4.00130.001" #for continuous discharge
+#Continuous measurements of stream discharge calculated from a stage-discharge rating curve and sensor-based measurements of water surface elevation
+  #data product ID will need to be checked online for each parameter
+
+site = "ARIK"
+  #Will do one site at a time, so we can evaluate rating curve more accurately 
+pack = "expanded"
+  #Always expanded, includes quality metrics for all of the quality assessment and quality control analyses.
+startdate = "2017-01" ; enddate = "2022-09"
+
+watquant <- loadByProduct(dpID, site, package=pack, startdate, enddate, check.size=FALSE) #returns a list with all data frames
+list2env(watquant, .GlobalEnv) #extract each list object into the environment (don't do this if working with multiple sites)
+
+#######save the files to SWRC server########
+write.csv(geo_gaugeWaterColumnRegression, 
+          "geo_gaugeWaterColumnRegression.csv", #contains regresion parameters and R2
+          row.names=F)
+
+write.csv(issueLog_00130, 
+          "issueLog_00130.csv", 
+          row.names=F)
+
+write.csv(readme_00130, 
+          "readme_00130.csv", 
+          row.names=F)
+
+write.csv(sdrc_gaugePressureRelationship, 
+          "sdrc_gaugePressureRelationship.csv", 
+          row.names=F)
+
+write.csv(variables_00130, 
+          "variables_00130.csv", 
+          row.names=F)
+
+#######################################################################################################
+#"csd_continuousDischarge" file contains the actual flow data and can be extremely large for some sites 
+#isolate parameters before downloading. This is a long file, it will crash most of the times
+  
+
+#################Split csd_continuousDischarge file into multiple years
+
+wquant_data = csd_continuousDischarge %>%
+  filter(dischargeFinalQF == 0 ) %>% #filter by flow values of acceptable quality (=0)
+  mutate(datetime = as.POSIXct(endDate, format = "%m/%d/%Y %H:%M:%S"),
+          year = year(datetime))
+
+years = list(2017,2018,2019,2020,2021,2022)
+
+for (i in 1:6){
+  
+     temp_d = subset(wquant_data, year==years[i])
+      write.csv(temp_d,paste("wquant_data_QApass_",years[i],".csv",sep=""))
+       
+} 
+
+
+
+
+###################################################################################################
+###################################################################################################
+###################################################################################################
+#note all these datasets do not have a continuous datetime vector, there are breaks that are not filled with NA observations
+
+
+
+
+#now we download rating curve for future inspection
+dpID = "DP4.00133.001" 
+site = "ARIK"
+pack = "expanded"
+startdate = "2017-01" ; enddate = "2022-09"
+
+ratCurve <- loadByProduct(dpID, site, package=pack, startdate, enddate, check.size=FALSE) #returns a list with all data frames
+list2env(ratCurve, .GlobalEnv) #extract each list object into the environment (don't do this if working with multiple sites)
+
+
+ratCurve_data = sdrc_gaugeDischargeMeas %>% 
+  mutate(datetime = as.POSIXct(endDate, format = "%m/%d/%Y %H:%M:%S"),
+          year = year(datetime)) #These are organized by water year, I'll take the end of each year (e..g, 2016-2017 year is coded as 2017)
+
+ggplot(ratCurve_data, aes(x=gaugeHeight, y=streamDischarge, color=as.factor(year))) + 
+  geom_point()
+
+#save this file
+write.csv(sdrc_gaugeDischargeMeas, 
+          "sdrc_gaugeDischargeMeas.csv", 
+          row.names=F)
+
+
+
+
+
+
+
+```
+
+

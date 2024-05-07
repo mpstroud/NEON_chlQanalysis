@@ -1,0 +1,205 @@
+---
+title: "One Site Water Quality Data Collection"
+author: "Marc Peipoch"
+date: "9/16/2022"
+output: html_document
+---
+
+Stack downloaded data files into single .zip file
+```{r setup, include=FALSE}
+library(neonUtilities) ; library(dplyr) ; library(lubridate) ; library(tidyr)
+options(stringsAsFactors=F) # character variables are not converted to factors
+```
+
+Download water chem data per site
+```{r}
+#bring sites from the sties_list.csv file 
+sites = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/sites_list.csv",header =F)
+sites = as.list(sites[,1]) #list of sites
+
+
+for (i in 1:length(sites)) {
+
+site = sites[i]
+
+setwd(paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/",site,"/01_input",sep=""))
+
+dpID = "DP1.20093.001" #This data product contains the quality-controlled, native sampling resolution data from NEON's surface water chemistry sampling protocol. Subsamples are analyzed at NEON domain headquarters for alkalinity and acid neutralizing capacity (ANC); other subsamples are sent to external facilities for a broad suite of analytes, including dissolved and total nutrients and carbon, cations and anions, and general chemistry. 
+
+startdate = "2017-01" ; enddate = "2022-09"
+
+pack = "basic"
+  #expanded comes up with a rbind problem when combinig columns with different attributes
+
+memory.limit(size=50000) #to set a higher value fpr memory use limit
+      
+      waterchemColl <- loadByProduct(dpID, site, package=pack, startdate, enddate, check.size=FALSE) #returns a list with all data frames
+      list2env(waterchemColl, .GlobalEnv) #extract each list object into the environment (don't do this if working with multiple sites)
+      
+      #######save the files to SWRC server########
+       write.csv(swc_externalLabDataByAnalyte, 
+                "swc_externalLabDataByAnalyte.csv", 
+                row.names=F)
+       
+}
+     
+   
+
+
+```
+
+Summarize each parameter per site (median, min, max) 
+```{r}
+
+#bring sites from the sties_list.csv file 
+sites = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/sites_list.csv",header =F)
+sites = as.list(sites[,1]) #list of sites
+
+
+for (i in 1:length(sites)) {
+
+site = sites[i]
+
+setwd(paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/",site,"/01_input",sep=""))
+
+waterchem_data = read.csv("swc_externalLabDataByAnalyte.csv")
+
+waterchem_data_summary = waterchem_data %>%
+  group_by(analyte) %>%
+    summarise(medianConc = median(analyteConcentration, na.rm=TRUE),
+              Q25Conc = quantile(analyteConcentration, probs = c(.25),na.rm=T),
+              Q75Conc = quantile(analyteConcentration, probs = c(.75),na.rm=T)) 
+
+#let's save a final product as summarized data per parameter 
+write.csv(waterchem_data_summary, 
+          paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/",site,"/04_product/waterchem_data_summary.csv",sep=""), 
+          row.names=F)
+
+}
+
+
+
+```
+
+
+Aggregate each data summary per site generated before into a single file per parameter. 
+```{r}
+#change accordingly for each parameter of interest
+parameter = "TSS"
+final_file = "TSS_AllSites"
+
+
+#bring sites from the sties_list.csv file 
+sites = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/sites_list.csv",header =F)
+sites = as.list(sites[,1])
+
+results_matrix = as.data.frame(matrix(nrow = 0 , ncol = 5))    
+colnames(results_matrix) = c("analyte","medianConc","Q25Conc","Q75Conc",
+                             "site")
+
+
+
+for (i in 1:length(sites)) {
+
+site = sites[i]
+ 
+
+waterchem_data_summary = read.csv(paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/",site,"/04_product/waterchem_data_summary.csv",sep=""))
+
+waterchem_data_summary_v2 = waterchem_data_summary %>%
+  filter(.,analyte == parameter) %>%
+  mutate(site = print(site))
+
+waterchem_data_summary_v2 = as.data.frame(waterchem_data_summary_v2)
+colnames(waterchem_data_summary_v2) = c("analyte","medianConc","Q25Conc","Q75Conc",
+                             "site")
+results_matrix = rbind(results_matrix,waterchem_data_summary_v2)
+
+}
+
+results_matrix <- apply(results_matrix,2,as.character)
+
+write.csv(results_matrix, 
+          paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/",final_file,".csv",sep=""))
+
+
+
+
+
+
+
+
+```
+
+Need to redo this calculating DIN:SRP ratios and Si:DIN ratios per date and site 
+```{r}
+
+#bring sites from the sties_list.csv file 
+sites = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/sites_list.csv",header =F)
+sites = as.list(sites[,1]) #list of sites
+
+
+for (i in 1:length(sites)) {
+
+site = sites[i]
+
+setwd(paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/",site,"/01_input",sep=""))
+
+waterchem_data = read.csv("swc_externalLabDataByAnalyte.csv")
+waterchem_data$analyte <- with(waterchem_data,  factor(analyte, levels = c("NH4 - N", "Ortho - P","NO3+NO2 - N", "Si"), 
+              labels = c("Ammonium", "SRP","Nitrate","Si")))
+
+waterchem_data_summary= waterchem_data %>%
+  select(siteID,startDate,analyte,analyteConcentration) %>%
+  drop_na(analyte) %>%
+  group_by(startDate,siteID,analyte) %>%
+  summarize(meanConc = mean(analyteConcentration)) %>%
+    spread(analyte,meanConc) %>%
+  drop_na(Ammonium,Nitrate) %>%
+  mutate(DIN_P = ((Ammonium + Nitrate)/14)/(SRP/30.9),
+         Si_DIN = (Si/28)/((Ammonium + Nitrate)/14)) %>%
+  select(siteID,startDate,DIN_P,Si_DIN) 
+  
+
+#let's save a final product as summarized data per parameter 
+write.csv(waterchem_data_summary, 
+          paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/",site,"/04_product/waterchemRatios_data_summary.csv",sep=""), 
+          row.names=F)
+
+}
+
+
+
+
+results_matrix = as.data.frame(matrix(nrow = 0 , ncol = 4))    
+colnames(results_matrix) = c("siteID","startDate", "DIN_P","Si_DIN")
+
+
+
+for (i in 1:length(sites)) {
+
+site = sites[i]
+ 
+
+waterchemRatios_data_summary = read.csv(paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/",site,"/04_product/waterchemRatios_data_summary.csv",sep=""))
+
+
+results_matrix = rbind(results_matrix,waterchemRatios_data_summary)
+
+}
+
+results_matrix <- apply(results_matrix,2,as.character)
+
+write.csv(results_matrix, "/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/StoichRatios_AllSites.csv")
+
+
+
+
+
+
+
+
+```
+
+
+

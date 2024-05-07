@@ -1,0 +1,138 @@
+---
+title: "AllSites_MergingResults"
+author: "Marc Peipoch"
+date: '2023-02-14'
+output: html_document
+---
+
+Merge all files per site/year/parameter in 1 file
+```{r setup, include=FALSE}
+setwd("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/Chlorophyll_export&calcs")
+
+file.names <- dir(getwd(), pattern =".csv")
+    temp.summary<-data.frame(matrix(ncol = 12, nrow = 1)) 
+    colnames(temp.summary) <- c("site", "start",	"end","tot_q_m3",	"duration_hrs",	"intensity_m3_hr",	"hyst_index",	"flsh_index",	"storm_id","totalChlexport","deltaChl","slope" )
+            
+    for(i in 1:length(file.names)){  
+              
+file <- read.table(file.names[i],header=TRUE, sep=",", stringsAsFactors=TRUE)
+
+file[,1] = paste(file.names[i])
+names(file)[1] ="site"
+
+data2 <- select(file,c(site,start,end,tot_q_m3,duration_hrs,intensity_m3_hr,
+                       hyst_index,flsh_index,storm_id,totalChlexport,deltaChl,slope))
+
+
+temp.summary<-rbind(temp.summary,data2)
+
+    }
+    
+write.csv(temp.summary,file = "/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/03_incremental/Chl_AllSites_2017_2022_withAddCalcs.csv")
+
+
+```
+
+
+Clean up merged files and inspect data
+```{r}
+library(stringr) ; library(lubridate)
+setwd("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/03_incremental")
+
+
+##########################################
+##########################Chlorophyll data
+##########################################
+Chl_index_merged = read.csv("Chl_AllSites_2017_2022_withAddCalcs.csv", header = T)
+
+names(Chl_index_merged)[1] ="obs_id"
+
+#fix the site column
+splitted_data = as.data.frame(str_split_fixed(Chl_index_merged[,"site"], "_",5))
+
+Chl_index_merged$site = splitted_data[,1]
+Chl_index_merged$year = splitted_data[,2]
+Chl_index_merged$date = as.POSIXct(Chl_index_merged$start, format = "%Y-%m-%d %H:%M:%S")
+Chl_index_merged$month = month(Chl_index_merged$date)
+
+Chl_index_merged2 <- select(Chl_index_merged,c(obs_id,site,year,month,start,end,tot_q_m3,duration_hrs,intensity_m3_hr,hyst_index,flsh_index,storm_id,totalChlexport,deltaChl,slope))
+
+Chl_index_merged2$slope = as.numeric(Chl_index_merged2$slope)
+
+#summarize by storm_id for all sites/year/month
+Chl_index_byStorm = Chl_index_merged2 %>%
+        group_by(site,year,month,storm_id) %>%
+        summarise(meanHI = mean(hyst_index, na.rm = TRUE),
+                  meanFI = mean(flsh_index, na.rm = TRUE),
+                  event_duration_hrs = mean(duration_hrs, na.rm = TRUE),
+                  event_intensity_m3hr = mean(intensity_m3_hr, na.rm = TRUE),
+                  totalChlexport = mean(totalChlexport, na.rm = TRUE),
+                  deltaChl = mean(deltaChl, na.rm = TRUE),
+                  slope = mean(slope, na.rm = TRUE))
+
+Chl_index_byStorm$meanHI[is.nan(Chl_index_byStorm$meanHI)] = NA
+Chl_index_byStorm = Chl_index_byStorm[-1,]
+
+write.csv(Chl_index_byStorm,file = "/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/03_incremental/Chl_index_byStorm_2017_2022_withAddCalcs.csv")
+
+
+##########################################
+############################Merge all data
+##########################################
+Chl_index_byStorm_2017_2022_withAddCalcs = Chl_index_byStorm
+Turb_index_byStorm = read.csv("Turb_index_byStorm_2017_2022.csv", header = T)
+
+Chl_index_byStorm_2017_2022_withAddCalcs$id = paste(Chl_index_byStorm_2017_2022_withAddCalcs$site,
+                             Chl_index_byStorm_2017_2022_withAddCalcs$year,
+                             Chl_index_byStorm_2017_2022_withAddCalcs$month,
+                             Chl_index_byStorm_2017_2022_withAddCalcs$storm_id,sep="_")
+
+Turb_index_byStorm$id = paste(Turb_index_byStorm$site,
+                             Turb_index_byStorm$year,
+                             Turb_index_byStorm$month,
+                             Turb_index_byStorm$storm_id,sep="_")
+
+temp_data = left_join(Chl_index_byStorm_2017_2022_withAddCalcs,Turb_index_byStorm,by="id")
+
+Chl_Turb_index_byStorm_2017_2022 = temp_data[,c(1,2,3,4,5,6,7,8,9,10,11,18,19)]
+
+ colnames(Chl_Turb_index_byStorm_2017_2022) <- c("site",	"year",	"month",	"storm_id",	"meanHI.Chl",	"meanFI.Chl",	"event_duration_hrs",	"event_intensity_m3hr",	"totalChlexport","deltaChl","slope","meanHI.turb",	"meanFI.turb")
+
+#save and inspect
+write.csv(Chl_Turb_index_byStorm_2017_2022,file = "/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/04_product/Chl_Turb_index_byStorm_2017_2022_withAddCalcs.csv")
+
+
+````
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

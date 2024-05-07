@@ -1,0 +1,163 @@
+---
+title: "One Site Water Quality Data Collection"
+author: "Marc Peipoch"
+date: "9/16/2022"
+output: html_document
+---
+
+packages
+```{r setup, include=FALSE}
+library(neonUtilities) ; library(dplyr) ; library(lubridate) ; library(tidyr)
+options(stringsAsFactors=F) # character variables are not converted to factors
+```
+
+Relative abundance by Division
+```{r}
+
+#bring sites from the sties_list.csv file 
+sites = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/sites_list.csv",header =F)
+sites = as.list(sites[,1])
+
+results_matrix = as.data.frame(matrix(nrow = 0 , ncol = 5))    
+colnames(results_matrix) = c("algalSampleType","collectDate","division","relabun", "site")
+
+
+for (i in 1:length(sites)) {
+
+site = sites[i]
+ 
+
+
+division_tax = read.csv(paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/",site,"/04_product/division_taxonomy_subset.csv",sep=""))
+
+division_tax_temp = division_tax %>%
+  group_by(algalSampleType,sampleID) %>%
+  mutate(sum_count = sum(algalCountPermL)) %>% #sum per date/sample
+  
+      group_by(algalSampleType,sampleID,division) %>%
+      mutate(relabun = algalCountPermL/sum_count,site = print(site)) %>%
+      select("algalSampleType","collectDate","division","relabun", "site")
+  
+
+
+division_tax_temp = as.data.frame(division_tax_temp)
+results_matrix = rbind(results_matrix,division_tax_temp)
+
+}
+
+results_matrix <- apply(results_matrix,2,as.character)
+
+write.csv(results_matrix, 
+          paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/division_relabun_perSite&Date&replicate.csv",sep=""))
+
+
+
+
+```
+
+
+Relative abundance by Family
+```{r}
+
+#bring sites from the sties_list.csv file 
+sites = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/sites_list.csv",header =F)
+sites = as.list(sites[,1])
+
+results_matrix = as.data.frame(matrix(nrow = 0 , ncol = 5))    
+colnames(results_matrix) = c("algalSampleType","collectDate","family","relabun","site")
+
+
+for (i in 1:length(sites)) {
+
+site = sites[i]
+ 
+
+
+family_tax = read.csv(paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/",site,"/04_product/family_taxonomy_subset.csv",sep=""))
+
+family_tax_temp = family_tax %>%
+  group_by(algalSampleType,sampleID) %>%
+  mutate(sum_count = sum(algalCountPermL)) %>% #sum per date/sample
+  
+      group_by(algalSampleType,sampleID,family) %>%
+      mutate(relabun = algalCountPermL/sum_count,site = print(site)) %>%
+      select("algalSampleType","collectDate","family","relabun", "site")
+  
+
+
+family_tax_temp = as.data.frame(family_tax_temp)
+results_matrix = rbind(results_matrix,family_tax_temp)
+
+}
+
+results_matrix <- apply(results_matrix,2,as.character)
+
+write.csv(results_matrix, 
+          paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/family_relabun_perSite&Date&replicate.csv",sep=""))
+
+
+
+
+```
+
+
+Relative abundance by Genus
+```{r}
+
+#bring sites from the sties_list.csv file 
+sites = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/sites_list.csv",header =F)
+sites = as.list(sites[,1])
+
+results_matrix = as.data.frame(matrix(nrow = 0 , ncol = 5))    
+colnames(results_matrix) = c("algalSampleType","collectDate","genus","relabun","site")
+
+
+for (i in 1:length(sites)) {
+
+site = sites[i]
+ 
+
+genus_tax = read.csv(paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/",site,"/04_product/genus_taxonomy_subset.csv",sep=""))
+
+genus_tax_temp = genus_tax %>%
+  group_by(algalSampleType,sampleID) %>%
+  mutate(sum_count = sum(algalCountPermL)) %>% #sum per date/sample
+  
+      group_by(algalSampleType,sampleID,genus) %>%
+      mutate(relabun = algalCountPermL/sum_count,site = print(site)) %>%
+      select("algalSampleType","collectDate","genus","relabun", "site")
+
+
+genus_tax_temp = as.data.frame(genus_tax_temp)
+results_matrix = rbind(results_matrix,genus_tax_temp)
+
+}
+
+results_matrix <- apply(results_matrix,2,as.character)
+
+write.csv(results_matrix, 
+          paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/genus_relabun_perSite&Date&replicate.csv",sep=""))
+
+
+
+
+```
+
+
+Standarized HI and FI indices
+```{r}
+
+#bring sites from the sties_list.csv file 
+indices_raw = read.table("clipboard", header=T,sep="\t")
+  
+indices_std = indices_raw %>%
+  group_by(site) %>%
+  mutate(standardized_HI = (meanHI.Chl - mean(meanHI.Chl)) / sd(meanHI.Chl),
+         standardized_FI = (meanFI.Chl - mean(meanFI.Chl)) / sd(meanFI.Chl))
+
+write.csv(indices_std, "/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/02_protocol/NeonDataAnalysis/indices_std.csv")
+
+
+
+```
+

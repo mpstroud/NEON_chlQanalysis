@@ -1,0 +1,848 @@
+---
+title: "Untitled"
+output: html_document
+date: "2023-08-31"
+---
+
+
+Figure S1 - NP ratios in water and algae
+```{r setup, include=FALSE}
+library(ggplot2); library(viridis) ;library(tidyr);library(dplyr)
+
+################################################################################################################################
+#######################################################Figure S1################################################################
+################################################################################################################################
+
+waterData = read.csv("waterData.csv", header=T)
+algaeData = read.csv("algaeData.csv", header=T)
+
+
+
+waterData_summary = waterData %>%
+  group_by(site) %>%
+  summarize(DIN_Pmed = median(DIN_P, na.rm=T),
+            DIN_Pmax = quantile(DIN_P, probs = c(.75),na.rm=T),
+            DIN_Pmin = quantile(DIN_P, probs = c(.25),na.rm=T),
+            Si_DINmed = median(Si_DIN, na.rm=T),
+            Si_DINmax = quantile(Si_DIN, probs = c(.75),na.rm=T),
+            Si_DINmin = quantile(Si_DIN, probs = c(.25),na.rm=T))
+
+
+algaeData_summary = algaeData %>%
+         group_by(Domain,site,algalSampleType) %>%
+         summarize(NPmed = median(NP, na.rm=T),
+            NPmax = quantile(NP, probs = c(.75),na.rm=T),
+            NPmin = quantile(NP, probs = c(.25),na.rm=T))
+
+mergedData = left_join(algaeData_summary,waterData_summary,by="site")
+
+
+ggplot(mergedData, aes(x=log10(DIN_Pmed), y=log10(NPmed), color=Domain)) + 
+geom_pointrange(aes(ymin=log10(NPmin), ymax=log10(NPmax),xmin=log10(DIN_Pmin), xmax=log10(DIN_Pmax))) +
+  ylim(0,2.5) + xlim(0,2.5) +
+  scale_colour_manual(values=c("#603913","#8DC63F", "#93C2E2","#FFFFFF", "#2BB673","#F7941E",
+                    "#DBCA65","#BCBEC0","#58595B","#A97C50","#1C75BC","#C2B59B",
+                    "#000000","#009444","#AFAF3A","#7851C4")) +
+  theme_bw() +
+  facet_wrap( ~ algalSampleType, ncol = 1) + theme(legend.position = "none",aspect.ratio = 1) 
+
+
+
+
+
+
+
+#############Figure 2
+familyData = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/family_relabun_perSite&Date&replicate_dominant.csv", header=T)
+
+  
+
+ggplot(data = familyData, aes(x=site, y=relabun)) + 
+             geom_boxplot(aes(fill=domain)) +
+               scale_fill_manual(values=c("#603913","#8DC63F", "#93C2E2","#FFFFFF", "#2BB673","#F7941E",
+                    "#DBCA65","#BCBEC0","#58595B","#A97C50","#1C75BC","#C2B59B",
+                    "#000000","#009444","#AFAF3A","#7851C4")) +
+theme_bw() +  
+facet_wrap( ~ family, ncol = 3)  + theme(legend.position = "none",aspect.ratio = 1) 
+
+################################################################################################################################
+```
+
+Figure 2 - NMDS
+```{r}
+#######################################################Figure 2#################################################################
+################################################################################################################################
+
+
+
+
+#let's organize data for benthic and seston separately 
+library(reshape2)
+
+genusData = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/genus_relabun_perSite&Date&replicate.csv", header=T)
+
+
+genusData_seston = genusData %>%
+    filter(.,algalSampleType=='seston'| algalSampleType=='phytoplankton')  %>%
+    select(sampleID,genus,relabun,site,domain) %>%
+          group_by(genus) %>% #remove genus with low counts
+          filter(sum(relabun)>= 0.1) %>%
+                spread(., genus, relabun) %>% #transpose and fill NAs with 0's
+                replace(is.na(.), 0) %>%
+                select(-sampleID)
+                
+
+genusData = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/genus_relabun_perSite&Datep.csv", header=T)
+
+
+genusData_benthic = genusData %>%
+    filter(.,algalSampleType=='epilithon'| algalSampleType=='epipsammon'| algalSampleType=='epixylon'
+           | algalSampleType=='epipelon'| algalSampleType=='epiphyton')  %>%
+    select(sampleID,algalSampleType,collectDate, genus,mean_relabun,site,domain) %>%
+                group_by(genus) %>% #remove genus with low counts
+                filter(sum(mean_relabun)>= 0.01) %>%
+                      spread(., genus, mean_relabun) %>% #transpose and fill NAs with 0's
+                      replace(is.na(.), 0) %>%
+                      select(-sampleID) %>%
+                       group_by(domain,site,collectDate,algalSampleType) %>%
+                       summarize(across(starts_with("Achnanthes"):ends_with("<NA>"), sum))
+
+
+
+
+#let's run the NMDS
+library(vegan) ; library(stringr)
+
+
+
+#######################################seston###########
+#clean up data
+
+genusData_seston_cleaned = genusData_seston[ ,3:ncol(genusData_seston)]
+row.names(genusData_seston_cleaned) = paste(genusData_seston$domain, row.names(genusData_seston), sep="_")
+
+
+# Running NMDS 
+genusData_distmat_NMS = metaMDS(genusData_seston_cleaned,
+          distance = "bray",
+          k = 3,
+          maxit = 999, 
+          trymax = 500,
+          wascores = TRUE)
+
+# Shepards test/goodness of fit
+goodness(genusData_distmat_NMS) # Produces a results of test statistics for goodness of fit for each point
+
+stressplot(genusData_distmat_NMS) # Produces a Shepards diagram
+
+
+# Extract score values for where sites are located.
+data_scores <- as.data.frame(scores(genusData_distmat_NMS)$sites)
+data_scores$domain <- rownames(data_scores) ; rownames(data_scores) = NULL
+temp_matrix = str_split_fixed(data_scores$domain, '_', 2)
+data_scores$domain <- temp_matrix[,1]
+
+par(mfrow = c(1,1))
+ordiplot(genusData_distmat_NMS,type="n")
+orditorp(genusData_distmat_NMS,display="species",col="red",air=0.01)
+orditorp(genusData_distmat_NMS,display="sites",cex=1.25,air=0.01)
+
+
+#plot the scores
+ggplot() +
+
+  geom_point(data = data_scores, aes(x = NMDS1, y = NMDS2, 
+                                     color = domain), size = 5) +
+  scale_colour_manual(values=c("#603913","#8DC63F", "#93C2E2","#FFFFFF", "#2BB673","#F7941E",
+                    "#DBCA65","#58595B","#A97C50","#C2B59B",
+                    "#000000","#009444","#AFAF3A","#7851C4")) +
+  xlim(-1.5,1.5) + ylim(-1.5,1.5) + theme_classic() + theme(legend.position="none") 
+
+
+# Assessing species significance and Extract loading for species/growth forms
+genusData_distmat_NMS.envfit <- envfit(genusData_distmat_NMS, genusData_seston_cleaned,permutations=999)
+
+data_loadings = as.data.frame(scores(genusData_distmat_NMS.envfit, "vectors"))
+
+
+
+# Now we can build the plot with species and select the significant ones in affinity
+
+ordiplot(genusData_distmat_NMS,type="n")
+orditorp(genusData_distmat_NMS,display="species",col="red",air=0.01)
+
+
+#ANOSIM
+anosim(genusData_seston_cleaned, genusData_seston$domain, distance = "bray", permutations = 9999)
+
+#ANSOIM for plankton versus seston
+genusData = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/genus_relabun_perSite&Date&replicate.csv", header=T)
+
+genusData_seston_v2 = genusData %>%
+    filter(.,algalSampleType=='seston'| algalSampleType=='phytoplankton')  %>%
+    select(sampleID,genus,relabun,algalSampleType) %>%
+          group_by(genus) %>% #remove genus with low counts
+          filter(sum(relabun)>= 0.1) %>%
+                spread(., genus, relabun) %>% #transpose and fill NAs with 0's
+                replace(is.na(.), 0) %>%
+                select(-sampleID)
+
+genusData_seston_v2_cleaned = genusData_seston_v2[ ,3:ncol(genusData_seston_v2)]
+
+
+anosim(genusData_seston_v2_cleaned, genusData_seston_v2$algalSampleType, distance = "bray", permutations = 9999)
+
+
+#ANSOIM for epilithon versus seston
+genusData = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/genus_relabun_perSite&Datep.csv", header=T)
+
+genusData_seston_v3 = genusData %>%
+    filter(.,algalSampleType=='seston'| algalSampleType=='epilithon' | site=='BLUE')  %>%
+    dplyr::select(sampleID,algalSampleType,collectDate, genus,mean_relabun,algalSampleType) %>%
+                group_by(genus) %>% #remove genus with low counts
+                filter(sum(mean_relabun)>= 0.01) %>%
+                      spread(., genus, mean_relabun) %>% #transpose and fill NAs with 0's
+                      replace(is.na(.), 0) %>%
+                      dplyr::select(-sampleID) %>%
+                       group_by(collectDate,algalSampleType) %>%
+                       summarize(across(starts_with("Achnanthes"):ends_with("<NA>"), sum))
+
+genusData_seston_v3_cleaned = genusData_seston_v3[ ,3:ncol(genusData_seston_v3)]
+
+
+anosim(genusData_seston_v3_cleaned, genusData_seston_v3$algalSampleType, distance = "bray", permutations = 9999)
+
+
+#ANSOIM for episammon versus seston
+genusData = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/genus_relabun_perSite&Datep.csv", header=T)
+
+genusData_seston_v3 = genusData %>%
+    filter(.,algalSampleType=='seston'| algalSampleType=='epipsammon')  %>%
+    select(sampleID,algalSampleType,collectDate, genus,mean_relabun,algalSampleType) %>%
+                group_by(genus) %>% #remove genus with low counts
+                filter(sum(mean_relabun)>= 0.01) %>%
+                      spread(., genus, mean_relabun) %>% #transpose and fill NAs with 0's
+                      replace(is.na(.), 0) %>%
+                      select(-sampleID) %>%
+                       group_by(collectDate,algalSampleType) %>%
+                       summarize(across(starts_with("Achnanthes"):ends_with("<NA>"), sum))
+
+genusData_seston_v3_cleaned = genusData_seston_v3[ ,3:ncol(genusData_seston_v3)]
+
+
+anosim(genusData_seston_v3_cleaned, genusData_seston_v3$algalSampleType, distance = "bray", permutations = 9999)
+
+
+#################################benthic##########
+#clean up data
+
+genusData_benthic_cleaned = genusData_benthic[ ,5:ncol(genusData_benthic)]
+row.names(genusData_benthic_cleaned) = paste(genusData_benthic$domain, row.names(genusData_benthic), sep="_")
+
+# Running NMDS 
+genusData_distmat_NMS = metaMDS(genusData_benthic_cleaned,
+          distance = "bray",
+          k = 3,
+          maxit = 999, 
+          trymax = 500,
+          wascores = TRUE)
+
+# Shepards test/goodness of fit
+goodness(genusData_distmat_NMS) # Produces a results of test statistics for goodness of fit for each point
+
+stressplot(genusData_distmat_NMS) # Produces a Shepards diagram
+
+# Extract score values for where sites are located.
+data_scores <- as.data.frame(scores(genusData_distmat_NMS)$sites)
+data_scores$domain <- rownames(data_scores) ; rownames(data_scores) = NULL
+temp_matrix = str_split_fixed(data_scores$domain, '_', 2)
+data_scores$domain <- temp_matrix[,1]
+
+#plot the scores
+ggplot() +
+
+  geom_point(data = data_scores, aes(x = NMDS1, y = NMDS3, 
+                                     color = domain), size = 4) +
+  scale_colour_manual(values=c("#603913","#8DC63F", "#93C2E2","#FFFFFF", "#2BB673","#F7941E",
+                    "#DBCA65","#BCBEC0","#58595B","#A97C50","#1C75BC","#C2B59B",
+                    "#000000","#009444","#AFAF3A","#7851C4")) +
+  theme_classic() + theme(legend.position="none") 
+
+
+# Assessing species significance and Extract loading for species/growth forms
+genusData_distmat_NMS.envfit <- envfit(genusData_distmat_NMS, genusData_benthic_cleaned,permutations=999)
+
+data_loadings = as.data.frame(scores(genusData_distmat_NMS.envfit, "vectors"))
+
+
+# Now we can build the plot with species and select the significant ones in affinity
+
+ordiplot(genusData_distmat_NMS,type="n")
+orditorp(genusData_distmat_NMS,display="species",col="red",air=0.01)
+
+
+#ANOSIM
+anosim(genusData_benthic_cleaned, genusData_benthic$domain, distance = "bray", permutations = 9999)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```
+
+Figure S2 and S3 - Boxplots per domain and family
+```{r}
+#######################################################Figure S2 and S3#################################################################
+################################################################################################################################
+
+
+
+#let's organize data for benthic and seston separately 
+library(reshape2)
+
+divisionData = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/division_relabun_perSite&Date&replicate.csv", header=T)
+
+
+#for seston
+divisionData_seston <- divisionData %>%
+  filter(algalSampleType == 'seston' | algalSampleType == 'phytoplankton') %>%
+  select(sampleID, division, relabun, site, domain) %>%
+  filter(!is.na(division)) %>%  # Exclude rows where division is NA
+  group_by(division)
+
+ggplot(divisionData_seston, aes(x = division, y = relabun)) +
+  geom_boxplot(aes(fill = division)) +
+  facet_wrap(~ site) +
+  scale_fill_manual(values=c("#99CC33", "#996600","#ffcc00", "#3399FF","#999999",
+                    "#000000","#00FFCC","#CC3300")) +
+  theme_bw()
+
+#for benthic
+divisionData_benthic <- divisionData %>%
+     filter(.,algalSampleType=='epilithon'| algalSampleType=='epipsammon'| algalSampleType=='epixylon'
+           | algalSampleType=='epipelon'| algalSampleType=='epiphyton')  %>% 
+  select(sampleID, division, relabun, site, domain) %>%
+  filter(!is.na(division)) %>%  # Exclude rows where division is NA
+  group_by(division)
+
+ggplot(divisionData_benthic, aes(x = division, y = relabun)) +
+  geom_boxplot(aes(fill = division)) +
+  facet_wrap(~ site) +
+  scale_fill_manual(values=c("#99CC33", "#996600","#ffcc00", "#3399FF","#999999",
+                  "#00FFCC","#CC3300")) +
+  theme_bw()
+
+
+
+```
+
+Figure 3 - exported and deltaChl-event intensity
+```{r}
+library(ggplot2)
+library(ggstance)
+
+stormData = read.csv("/Users/mpeipoch/Library/CloudStorage/GoogleDrive-mpeipoch@stroudcenter.org/My Drive/manuscripts/NEON_plankton/workingData/NeonSites_Chl&Turb_2017_2022_7Jul2023.csv", header=T)
+
+#deltaCHl vs event intensity
+stormSummary = stormData %>%
+         group_by(domain,site) %>%
+         summarize(deltaChlmed = median(deltaChl, na.rm=T),
+            deltaChlmax = quantile(deltaChl, probs = c(.75),na.rm=T),
+            deltaChlmin = quantile(deltaChl, probs = c(.25),na.rm=T),
+            watArea = mean(watArea, na.rm=T),
+            event_intensitymed = median(event_intensity, na.rm=T)/watArea,
+            event_intensitymax = quantile(event_intensity, probs = c(.75),na.rm=T)/watArea,
+            event_intensitymin = quantile(event_intensity, probs = c(.25),na.rm=T)/watArea,
+            totalChlexport_perwatareamean = median(totalChlexport_perwatarea, na.rm=T)) 
+
+
+ggplot(stormSummary, aes(x=log10(event_intensitymed), y=log10(deltaChlmed))) + 
+                           geom_point(aes(color=domain), size=5) +
+                           scale_colour_manual(values=c("#603913","#8DC63F", "#93C2E2","#FFFFFF", "#2BB673","#F7941E",
+                    "#DBCA65","#BCBEC0","#58595B","#A97C50","#1C75BC","#C2B59B",
+                    "#000000","#009444","#AFAF3A","#7851C4")) +
+          theme_bw() + theme(legend.position = "none",aspect.ratio = 1) +
+          geom_errorbar(aes(ymin=log10(deltaChlmin), ymax=log10(deltaChlmax), colour=domain, width=.025)) + 
+          geom_errorbarh(aes(xmin=log10(event_intensitymin), xmax=log10(event_intensitymax),colour=domain, height=0.05))
+
+
+#totalChlexport_perwater__to do In excel
+
+stormSummary = stormData %>%
+         group_by(domain,site) %>%
+         summarize(totalChlexport_perwatareamed = median(totalChlexport_perwatarea, na.rm=T),
+            totalChlexport_perwatareamax = quantile(totalChlexport_perwatarea, probs = c(.75),na.rm=T),
+            totalChlexport_perwatareamin = quantile(totalChlexport_perwatarea, probs = c(.25),na.rm=T))
+
+```
+
+Figure 4 - Hysteresis 
+```{r}
+
+stormData = read.csv("/Users/mpeipoch/Library/CloudStorage/GoogleDrive-mpeipoch@stroudcenter.org/My Drive/manuscripts/NEON_plankton/workingData/NeonSites_Chl&Turb_2017_2022_7Jul2023.csv", header=T)
+
+#CQ slope
+stormSummary = stormData %>%
+         group_by(domain,site) %>%
+         summarize(CQslopemed = median(CQslope, na.rm=T),
+            CQslopemax = quantile(CQslope, probs = c(.75),na.rm=T),
+            CQslopemin = quantile(CQslope, probs = c(.25),na.rm=T),
+            watArea = mean(watArea, na.rm=T)) 
+  
+ggplot(stormSummary, aes(x=log10(watArea), y=CQslopemed, color=domain)) + 
+geom_pointrange(aes(ymin=CQslopemin, ymax=CQslopemax, stroke = 3)) +
+  ylim(-0.5,2.5) + 
+  scale_colour_manual(values=c("#603913","#8DC63F", "#93C2E2","#FFFFFF", "#2BB673","#F7941E",
+                    "#DBCA65","#BCBEC0","#58595B","#A97C50","#1C75BC","#C2B59B",
+                    "#000000","#009444","#AFAF3A","#7851C4")) +
+  theme_bw() + theme(legend.position = "none",aspect.ratio = 1) 
+
+#FI index
+stormSummary = stormData %>%
+         group_by(domain,site) %>%
+         summarize(meanFI.Chlmed = median(meanFI.Chl, na.rm=T),
+            meanFI.Chlmax = quantile(meanFI.Chl, probs = c(.75),na.rm=T),
+            meanFI.Chlmin = quantile(meanFI.Chl, probs = c(.25),na.rm=T),
+            watArea = mean(watArea, na.rm=T)) 
+  
+ggplot(stormSummary, aes(x=log10(watArea), y=meanFI.Chlmed, color=domain)) + 
+geom_pointrange(aes(ymin=meanFI.Chlmin, ymax=meanFI.Chlmax, stroke = 3)) +
+  ylim(-0.5,1) + 
+  scale_colour_manual(values=c("#603913","#8DC63F", "#93C2E2","#FFFFFF", "#2BB673","#F7941E",
+                    "#DBCA65","#BCBEC0","#58595B","#A97C50","#1C75BC","#C2B59B",
+                    "#000000","#009444","#AFAF3A","#7851C4")) +
+  theme_bw() + theme(legend.position = "none",aspect.ratio = 1) 
+
+
+#ChlHysteresis do In excel
+
+stormSummary = stormData %>%
+         group_by(domain,site) %>%
+         summarise(meanHI.Chlmed = median(meanHI.Chl, na.rm=T),
+            meanHI.Chlmax = quantile(meanHI.Chl, probs = c(.75),na.rm=T),
+            meanHI.Chlmin = quantile(meanHI.Chl, probs = c(.25),na.rm=T))
+
+
+
+#boxplot for HI values
+boxplot(meanHI.Chl ~ site, data = stormData, ylim=c(-1,1))
+        
+#let's put them in order
+library(tidyverse) 
+ggplot(stormData, aes(x=reorder(site, meanHI.Chl), y=meanHI.Chl,fill=domain)) + 
+  
+  # geom_boxplot is used to plot the boxplot 
+  geom_boxplot() + ylim(-0.8,0.8) + 
+    scale_fill_manual(values=c("#603913","#8DC63F", "#93C2E2","#FFFFFF", "#2BB673","#F7941E",
+                    "#DBCA65","#BCBEC0","#58595B","#A97C50","#1C75BC","#C2B59B",
+                    "#000000","#009444","#AFAF3A","#7851C4")) +
+  theme_bw() +  theme(legend.position = "none",aspect.ratio = 1) 
+        
+        
+        
+
+```
+
+Figure 5 - Simulation benthic/exported
+```{r}
+#input and prepare data for resampling
+
+
+######################################event-specific imported data
+stormData = read.csv("/Users/mpeipoch/Library/CloudStorage/GoogleDrive-mpeipoch@stroudcenter.org/My Drive/manuscripts/NEON_plankton/workingData/NeonSites_Chl&Turb_2017_2022_7Jul2023.csv", header=T)
+export_gChl = stormData %>%
+  select(totalChlexport,site,domain)
+
+######################################need to get channel area per order (hydrsequence will suffice)
+geographicCorrdinates = read.csv("/Users/mpeipoch/Downloads/geographicCorrdinates.csv", header=T)
+#remove the sites with no nhdplusTools information due to being outside of the CONTUS or too big (TOMB)
+geographicCorrdinates = geographicCorrdinates %>%
+  filter(!site %in% c("TOMB", "CUPE","CARI" ,"GUIL" ))
+
+library(sf)
+library(nhdR)
+library(dplyr)
+
+# empty list to store results for each site
+results_list <- list()
+
+for (site_index in 1:22) {
+
+  current_site <- geographicCorrdinates[site_index, ]
+  
+  start_point <- st_sfc(st_point(c(current_site$lon, current_site$lat)), crs = 4269)
+  start_comid <- discover_nhdplus_id(start_point)
+  flowline <- navigate_nldi(list(featureSource = "comid", featureID = start_comid),
+                             mode = "upstreamTributaries", distance_km = 1000)
+
+  subset_file <- tempfile(fileext = ".gpkg")
+  subset <- subset_nhdplus(comids = as.integer(flowline$UT$nhdplus_comid),
+                           output_file = subset_file, nhdplus_data = "download",
+                           flowline_only = FALSE, return_data = TRUE, overwrite = TRUE)
+  
+  flowline <- subset$NHDFlowline_Network
+  flowline_subset =  flowline %>%
+    select(totdasqkm,lengthkm)
+  
+  # Store the results along with site information, column number should be the same unless nhdplusTools screwed up...
+  results <- data.frame(site = current_site$site, flowline_subset)
+  results_list[[site_index]] <- results
+}
+
+combined_results <- bind_rows(results_list)
+
+
+
+#calculate stream width based on drainage area relationship to Q and Q to w, (hydraulic geometry)
+# empty list to store results for each site
+results_area_calc = list()
+Area_results = matrix(nrow=0,ncol=2)
+colnames(Area_results) = c("site", "totalArea")
+
+for (site_index in 1:22) {
+
+  current_site_id <- geographicCorrdinates[site_index,1 ]
+  
+  current_site = combined_results %>%
+    filter(site == current_site_id)
+  
+  for (i in 1:9999) {
+
+                # for Q-w exponent (b) (from Sigh 2003) 
+                exp_b = rnorm(1,0.47,0.13)
+                
+                # for Q-A exponent (c) (from Galster 2007) 
+                exp_c = rnorm(1,0.8,0.057)
+                  
+  sum_current_site = current_site %>%
+        mutate(chanwidth = totdasqkm^(exp_b*exp_c),
+               channarea = ((chanwidth/1000) * lengthkm)) %>%
+        summarize(totalArea = sum(channarea)) #channel area in km2
+
+ # Store the results 
+  results <- data.frame(site = current_site_id, sum_current_site)
+  results_area_calc[[i]] <- results
+  
+  }
+  
+site_results <- bind_rows(results_area_calc) 
+Area_results = rbind(Area_results,site_results)
+ 
+}
+
+#this dataset has simulated total channel area per watershed:
+Area_results
+
+
+######################################Benthic data
+BenthicData = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/ChlaContent_AllSites.csv", header=T)
+
+
+BenthicData_mod = BenthicData %>%
+    filter(!algalSampleType %in% c("seston", "phytoplankton"))  %>%
+    group_by(site,collectDate,algalSampleType) %>%
+      summarize(totalChl_perType = sum(mgChlM2orL))
+
+
+
+
+############################RESAMPLING THE 3 DATASETS####################################
+#########################################################################################
+export_gChl #in gChl per vent
+Area_results #in km2, 1000 simulations per site
+BenthicData_mod #in mg Chl m-2 per date and habitat
+
+final_data = list()
+final_dataset = matrix(nrow=0,ncol=3)
+colnames(final_dataset) = c("site", "total_benthic_stock", "total_exported_stock")
+
+for (site_index in 1:22) {
+
+  current_site_id <- geographicCorrdinates[site_index,1 ]
+  
+  export_stats = export_gChl %>%
+    filter(site == current_site_id) %>%
+    select(totalChlexport) %>%
+    summarize(avg = mean(totalChlexport,na.rm=T),
+              SD = sd(totalChlexport,na.rm=T))
+    
+  benthic_stats = BenthicData_mod %>%
+    filter(site == current_site_id) %>%
+    group_by(algalSampleType) %>%
+    summarize(avg = mean(totalChl_perType,na.rm=T),
+              SD = sd(totalChl_perType,na.rm=T))
+  
+  Area_channel = Area_results %>%
+    filter(site == current_site_id)
+  
+  for (j in 1:9999) {
+
+                  
+exported = rlnorm(1, log(export_stats$avg^2/sqrt(export_stats$SD^2 + export_stats$avg^2)), 
+            sqrt(log(1 + (export_stats$SD^2/export_stats$avg^2)))) #found out that rlnomr in r is quite tricky, this help a lot: https://msalganik.wordpress.com/2017/01/21/making-sense-of-the-rlnorm-function-in-r/comment-page-1/
+
+if(any(benthic_stats$algalSampleType == "epilithon")) {
+  benthic_stats_sub = benthic_stats %>% 
+  filter(algalSampleType == "epilithon") 
+    benthic_1 = rlnorm(1, log(benthic_stats_sub$avg^2/sqrt(benthic_stats_sub$SD^2 + benthic_stats_sub$avg^2)), 
+            sqrt(log(1 + (benthic_stats_sub$SD^2/benthic_stats_sub$avg^2))))
+} else {
+  benthic_1 <- NA
+}
+
+      if(any(benthic_stats$algalSampleType == "epipsammon")) {
+        benthic_stats_sub = benthic_stats %>% 
+        filter(algalSampleType == "epipsammon")  
+          benthic_2 = rlnorm(1, log(benthic_stats_sub$avg^2/sqrt(benthic_stats_sub$SD^2 + benthic_stats_sub$avg^2)), 
+            sqrt(log(1 + (benthic_stats_sub$SD^2/benthic_stats_sub$avg^2))))
+      } else {
+        benthic_2 <- NA
+}
+
+            if(any(benthic_stats$algalSampleType == "epiphyton")) {
+              benthic_stats_sub = benthic_stats %>% 
+              filter(algalSampleType == "epiphyton")  
+                benthic_3 = rlnorm(1, log(benthic_stats_sub$avg^2/sqrt(benthic_stats_sub$SD^2 + benthic_stats_sub$avg^2)), 
+                  sqrt(log(1 + (benthic_stats_sub$SD^2/benthic_stats_sub$avg^2))))
+            } else {
+              benthic_3 <- NA
+}
+
+                if(any(benthic_stats$algalSampleType == "epixylon")) {
+                  benthic_stats_sub = benthic_stats %>% 
+                  filter(algalSampleType == "epixylon")  
+                    benthic_4 = rlnorm(1, log(benthic_stats_sub$avg^2/sqrt(benthic_stats_sub$SD^2 + benthic_stats_sub$avg^2)), 
+                  sqrt(log(1 + (benthic_stats_sub$SD^2/benthic_stats_sub$avg^2))))
+                } else {
+                  benthic_4 <- NA
+}
+
+benthic = sum(benthic_1,benthic_2,benthic_3,benthic_4,na.rm=T)
+
+
+random_area <- as.numeric(Area_channel[sample(nrow(Area_channel), 1), "totalArea"])
+
+#compare the exported with benthic standing stocks
+total_benthic_stock = (benthic/1000) * (random_area*1000000) # in total grams Chl
+total_exported_stock = exported
+
+# Store the results 
+  results <- data.frame(site = current_site_id, total_benthic_stock,total_exported_stock)
+  final_data[[j]] <- results
+  
+  }
+
+
+
+final_data_temp <- bind_rows(final_data) 
+final_dataset = rbind(final_dataset,final_data_temp)
+ 
+}
+
+#################Now we plot it
+
+final_dataset_plot = final_dataset %>%
+  group_by(site) %>%
+  summarize(benthic_med = median(total_benthic_stock, na.rm=T),
+            benthic_max = quantile(total_benthic_stock, probs = c(.95),na.rm=T),
+            benthic_min = quantile(total_benthic_stock, probs = c(.05),na.rm=T),
+            exported_med = median(total_exported_stock, na.rm=T),
+            exported_max = quantile(total_exported_stock, probs = c(.95),na.rm=T),
+            exported_min = quantile(total_exported_stock, probs = c(.05),na.rm=T))
+
+
+ggplot(final_dataset_plot, aes(x=log10(benthic_med), y=log10(exported_med))) + 
+                           geom_point(aes(color=site), size=5) +
+                           scale_colour_manual(values=c("#93C2E2", "#1C75BC" , "#BCBEC0", "#009444","#58595B","#AFAF3A","#000000","#DBCA65","#C2B59B","#603913","#F7941E","#A97C50",
+"#58595B","#C2B59B","#A97C50","#F7941E","#009444","#2BB673","#FFFFFF","#1C75BC","#603913","#AFAF3A")) +
+          ylim(0,7) + xlim(0,7) + 
+          theme_bw() + theme(legend.position = "none",aspect.ratio = 1) +
+          geom_errorbar(aes(ymin=log10(exported_min), ymax=log10(exported_max), colour=site, width=.025)) + 
+          geom_errorbarh(aes(xmin=log10(benthic_min), xmax=log10(benthic_max),colour=site, height=0.05))
+
+
+
+
+
+
+
+
+
+
+
+
+```
+
+Figure S4 - HI vs event intensity
+```{r}
+
+stormData = read.csv("/Users/mpeipoch/Library/CloudStorage/GoogleDrive-mpeipoch@stroudcenter.org/My Drive/manuscripts/NEON_plankton/workingData/NeonSites_Chl&Turb_2017_2022_7Jul2023.csv", header=T)
+
+#deltaCHl vs event intensity
+stormDataA = stormData %>%
+         filter(site %in% c("REDB", "BLDE","CARI" ,"HOPB", "TECR","BIGC","PRIN","BLUE"))
+stormDataA = stormDataA[-2,] #BIGC outloer
+
+stormDataB = stormData %>%
+         filter(!site %in% c("REDB", "BLDE","CARI" ,"HOPB", "TECR","BIGC","PRIN","BLUE"))
+
+
+ggplot(stormDataA, aes(x = log10(event_intensity), y = meanHI.Chl)) +
+  geom_point(aes(color = site), size = 5) +
+  geom_smooth(method = "lm", se = FALSE, aes(color = site), size = 1) +  # Add linear fit lines
+  scale_colour_manual(values = c("#1C75BC","#BCBEC0","#009444","#7851C4","#DBCA65","#009444","#2BB673","#1C75BC" )) +
+  theme_bw() + xlim(0.5,4.5) + ylim(0-1,1)
+  theme(legend.position = "none", aspect.ratio = 1)
+
+
+# Initialize lists to store results
+site_names <- unique(stormDataA$site)
+slope_list <- numeric(length(site_names))
+p_value_list <- numeric(length(site_names))
+
+# Extract slope and p-value for each site
+for (i in 1:length(site_names)) {
+  siteID <- site_names[i]
+  subset_data <- subset(stormDataA, site == siteID)
+  summary_data <- summary(lm(meanHI.Chl ~ log10(event_intensity), data = subset_data))
+  slope_list[i] <- summary_data$coefficients[2, "Estimate"]
+  p_value_list[i] <- summary_data$coefficients[2, "Pr(>|t|)"]
+}
+
+# Create a data frame with results
+result_data <- data.frame(site = site_names, slope = slope_list, p_value = p_value_list)
+
+# Print the slope and p-value for each site
+print(result_data)
+
+
+ggplot(stormDataB, aes(x = log10(event_intensity), y = meanHI.Chl)) +
+  geom_point(aes(color = site), size = 5) +
+  geom_smooth(method = "lm", se = FALSE, aes(color = site), size = 1) +  # Add linear fit lines
+  scale_colour_manual(values = c("#93C2E2","#58595B","#AFAF3A","#8DC63F","#000000", "#8DC63F","#C2B59B","#603913","#F7941E", "#A97C50", "#58595B","#C2B59B","#A97C50","#F7941E","#FFFFFF","#58595B","#603913","#AFAF3A")) +
+  theme_bw() + xlim(0.5,4.5) + ylim(0-1,1)
+  theme(legend.position = "none", aspect.ratio = 1)
+
+
+# Initialize lists to store results
+site_names <- unique(stormDataB$site)
+slope_list <- numeric(length(site_names))
+p_value_list <- numeric(length(site_names))
+
+# Extract slope and p-value for each site
+for (i in 1:length(site_names)) {
+  siteID <- site_names[i]
+  subset_data <- subset(stormDataB, site == siteID)
+  summary_data <- summary(lm(meanHI.Chl ~ log10(event_intensity), data = subset_data))
+  slope_list[i] <- summary_data$coefficients[2, "Estimate"]
+  p_value_list[i] <- summary_data$coefficients[2, "Pr(>|t|)"]
+}
+
+# Create a data frame with results
+result_data <- data.frame(site = site_names, slope = slope_list, p_value = p_value_list)
+
+# Print the slope and p-value for each site
+print(result_data)
+
+```
+
+Figure 15N
+```{r}
+library(ggplot2)
+library(ggstance)
+
+stormData = read.csv("/Users/mpeipoch/Library/CloudStorage/GoogleDrive-mpeipoch@stroudcenter.org/My Drive/manuscripts/NEON_plankton/workingData/NeonSites_Chl&Turb_2017_2022_7Jul2023.csv", header=T)
+
+#deltaCHl vs event intensity
+stormSummary = stormData %>%
+         group_by(domain,site) %>%
+         summarize(deltaChlmed = median(deltaChl, na.rm=T),
+            deltaChlmax = quantile(deltaChl, probs = c(.75),na.rm=T),
+            deltaChlmin = quantile(deltaChl, probs = c(.25),na.rm=T),
+            watArea = mean(watArea, na.rm=T),
+            event_intensitymed = median(event_intensity, na.rm=T)/watArea,
+            event_intensitymax = quantile(event_intensity, probs = c(.75),na.rm=T)/watArea,
+            event_intensitymin = quantile(event_intensity, probs = c(.25),na.rm=T)/watArea,
+            totalChlexport_perwatareamean = median(totalChlexport_perwatarea, na.rm=T)) 
+
+
+ggplot(stormSummary, aes(x=log10(event_intensitymed), y=log10(deltaChlmed))) + 
+                           geom_point(aes(color=domain), size=5) +
+                           scale_colour_manual(values=c("#603913","#8DC63F", "#93C2E2","#FFFFFF", "#2BB673","#F7941E",
+                    "#DBCA65","#BCBEC0","#58595B","#A97C50","#1C75BC","#C2B59B",
+                    "#000000","#009444","#AFAF3A","#7851C4")) +
+          theme_bw() + theme(legend.position = "none",aspect.ratio = 1) +
+          geom_errorbar(aes(ymin=log10(deltaChlmin), ymax=log10(deltaChlmax), colour=domain, width=.025)) + 
+          geom_errorbarh(aes(xmin=log10(event_intensitymin), xmax=log10(event_intensitymax),colour=domain, height=0.05))
+
+
+#totalChlexport_perwater__to do In excel
+
+stormSummary = stormData %>%
+         group_by(domain,site) %>%
+         summarize(totalChlexport_perwatareamed = median(totalChlexport_perwatarea, na.rm=T),
+            totalChlexport_perwatareamax = quantile(totalChlexport_perwatarea, probs = c(.75),na.rm=T),
+            totalChlexport_perwatareamin = quantile(totalChlexport_perwatarea, probs = c(.25),na.rm=T))
+
+```
+

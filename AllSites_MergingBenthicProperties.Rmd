@@ -1,0 +1,362 @@
+---
+title: "CommunityAnalysis"
+author: "Marc Peipoch"
+date: '2023-03-22'
+output: html_document
+---
+
+packages
+```{r setup, include=FALSE}
+library(neonUtilities) ; library(dplyr) ; library(lubridate) ; library(tidyr)
+options(stringsAsFactors=F) # character variables are not converted to factors
+```
+
+Chlorophyll-a abundance
+```{r}
+#change accordingly for each parameter of interest
+initial_parameter = "alg_chl"
+parameter = "mgChlM2orL"
+final_file = "ChlaContent_AllSites"
+
+
+#bring sites from the sties_list.csv file 
+sites = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/sites_list.csv",header =F)
+sites = as.list(sites[,1])
+
+results_matrix = as.data.frame(matrix(nrow = 0 , ncol = 4))    
+colnames(results_matrix) = c("algalSampleType","collectDate",print(parameter),"site")
+
+
+for (i in 1:length(sites)) {
+
+site = sites[i]
+ 
+
+alg_par = read.csv(paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/",site,"/04_product/",initial_parameter,".csv",sep=""))
+
+Csummary = alg_par %>%
+  group_by(algalSampleType,collectDate) %>%
+  summarise(parameter = (mean(algalConc, na.rm=T))/1000, par_SEM = ((sd(algalConc, na.rm=T))/1000)/sqrt(n())) %>%
+  mutate(site = print(site)) #in mgC per m2 OR L
+
+Csummary = as.data.frame(Csummary)
+colnames(Csummary) = c("algalSampleType","collectDate",print(parameter),"par_SEM","site")
+results_matrix = rbind(results_matrix,Csummary)
+
+}
+
+results_matrix <- apply(results_matrix,2,as.character)  
+
+write.csv(results_matrix, 
+          paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/",final_file,".csv",sep=""))
+
+
+
+
+```
+
+Pheophytin abundance
+```{r}
+#change accordingly for each parameter of interest
+initial_parameter = "alg_pheophytin"
+parameter = "mgPheoM2orL"
+final_file = "PheoContent_AllSites"
+
+
+#bring sites from the sties_list.csv file 
+sites = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/sites_list.csv",header =F)
+sites = as.list(sites[,1])
+
+results_matrix = as.data.frame(matrix(nrow = 0 , ncol = 4))    
+colnames(results_matrix) = c("algalSampleType","collectDate",print(parameter),"site")
+
+
+for (i in 1:length(sites)) {
+
+site = sites[i]
+ 
+
+alg_par = read.csv(paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/",site,"/04_product/",initial_parameter,".csv",sep=""))
+
+Csummary = alg_par %>%
+  group_by(algalSampleType,collectDate) %>%
+  summarise(parameter = (mean(algalConc, na.rm=T))/1000, par_SEM = ((sd(algalConc, na.rm=T))/1000)/sqrt(n())) %>%
+  mutate(site = print(site)) #in mgC per m2 OR L
+
+Csummary = as.data.frame(Csummary)
+colnames(Csummary) = c("algalSampleType","collectDate",print(parameter),"par_SEM","site")
+results_matrix = rbind(results_matrix,Csummary)
+
+}
+
+results_matrix <- apply(results_matrix,2,as.character)  
+
+write.csv(results_matrix, 
+          paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/",final_file,".csv",sep=""))
+
+
+
+
+```
+
+Total Chlorophyll abundance
+```{r}
+#change accordingly for each parameter of interest
+initial_parameter = "alg_totalchl"
+parameter = "mgtotalChlM2orL"
+final_file = "TotalChlContent_AllSites"
+
+
+#bring sites from the sties_list.csv file 
+sites = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/sites_list.csv",header =F)
+sites = as.list(sites[,1])
+
+results_matrix = as.data.frame(matrix(nrow = 0 , ncol = 4))    
+colnames(results_matrix) = c("algalSampleType","collectDate",print(parameter),"site")
+
+
+for (i in 1:length(sites)) {
+
+site = sites[i]
+ 
+
+alg_par = read.csv(paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/",site,"/04_product/",initial_parameter,".csv",sep=""))
+
+Csummary = alg_par %>%
+  group_by(algalSampleType,collectDate) %>%
+  summarise(parameter = (mean(algalConc, na.rm=T))/1000, par_SEM = ((sd(algalConc, na.rm=T))/1000)/sqrt(n())) %>%
+  mutate(site = print(site)) #in mgC per m2 OR L
+
+Csummary = as.data.frame(Csummary)
+colnames(Csummary) = c("algalSampleType","collectDate",print(parameter),"par_SEM","site")
+results_matrix = rbind(results_matrix,Csummary)
+
+}
+
+results_matrix <- apply(results_matrix,2,as.character)  
+
+write.csv(results_matrix, 
+          paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/",final_file,".csv",sep=""))
+
+
+
+```
+
+Carbon abundance
+```{r}
+#change accordingly for each parameter of interest
+initial_parameter = "alg_carbon"
+parameter = "mgCM2orL"
+final_file = "CarbonContent_AllSites"
+
+
+#bring sites from the sties_list.csv file 
+sites = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/sites_list.csv",header =F)
+sites = as.list(sites[,1])
+
+results_matrix = as.data.frame(matrix(nrow = 0 , ncol = 4))    
+colnames(results_matrix) = c("algalSampleType","collectDate",print(parameter),"site")
+
+
+for (i in 1:length(sites)) {
+
+site = sites[i]
+ 
+
+alg_par = read.csv(paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/",site,"/04_product/",initial_parameter,".csv",sep=""))
+
+Csummary = alg_par %>%
+  group_by(algalSampleType,collectDate) %>%
+  summarise(parameter = (mean(algalConc, na.rm=T))/1000, par_SEM = ((sd(algalConc, na.rm=T))/1000)/sqrt(n())) %>%
+  mutate(site = print(site)) #in mgC per m2 OR L
+
+Csummary = as.data.frame(Csummary)
+colnames(Csummary) = c("algalSampleType","collectDate",print(parameter),"par_SEM","site")
+results_matrix = rbind(results_matrix,Csummary)
+
+}
+
+results_matrix <- apply(results_matrix,2,as.character)  
+
+write.csv(results_matrix, 
+          paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/",final_file,".csv",sep=""))
+
+
+```
+
+Nitrogen abundance
+```{r}
+#change accordingly for each parameter of interest
+initial_parameter = "alg_nitrogen"
+parameter = "mgNM2orL"
+final_file = "NitrogenContent_AllSites"
+
+
+#bring sites from the sties_list.csv file 
+sites = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/sites_list.csv",header =F)
+sites = as.list(sites[,1])
+
+results_matrix = as.data.frame(matrix(nrow = 0 , ncol = 4))    
+colnames(results_matrix) = c("algalSampleType","collectDate",print(parameter),"site")
+
+
+for (i in 1:length(sites)) {
+
+site = sites[i]
+ 
+
+alg_par = read.csv(paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/",site,"/04_product/",initial_parameter,".csv",sep=""))
+
+Csummary = alg_par %>%
+  group_by(algalSampleType,collectDate) %>%
+  summarise(parameter = (mean(algalConc, na.rm=T))/1000, par_SEM = ((sd(algalConc, na.rm=T))/1000)/sqrt(n())) %>%
+  mutate(site = print(site)) #in mgC per m2 OR L
+
+Csummary = as.data.frame(Csummary)
+colnames(Csummary) = c("algalSampleType","collectDate",print(parameter),"par_SEM","site")
+results_matrix = rbind(results_matrix,Csummary)
+
+}
+
+results_matrix <- apply(results_matrix,2,as.character)  
+
+write.csv(results_matrix, 
+          paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/",final_file,".csv",sep=""))
+
+
+
+```
+
+Phosphorous abundance
+```{r}
+#change accordingly for each parameter of interest
+initial_parameter = "alg_phosphorous"
+parameter = "mgPM2orL"
+final_file = "PhosphorousContent_AllSites"
+
+
+#bring sites from the sties_list.csv file 
+sites = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/sites_list.csv",header =F)
+sites = as.list(sites[,1])
+
+results_matrix = as.data.frame(matrix(nrow = 0 , ncol = 4))    
+colnames(results_matrix) = c("algalSampleType","collectDate",print(parameter),"site")
+
+
+for (i in 1:length(sites)) {
+
+site = sites[i]
+ 
+
+alg_par = read.csv(paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/",site,"/04_product/",initial_parameter,".csv",sep=""))
+
+Csummary = alg_par %>%
+  group_by(algalSampleType,collectDate) %>%
+  summarise(parameter = (mean(algalConc, na.rm=T))/1000, par_SEM = ((sd(algalConc, na.rm=T))/1000)/sqrt(n())) %>%
+  mutate(site = print(site)) #in mgC per m2 OR L
+
+Csummary = as.data.frame(Csummary)
+colnames(Csummary) = c("algalSampleType","collectDate",print(parameter),"par_SEM","site")
+results_matrix = rbind(results_matrix,Csummary)
+
+}
+
+results_matrix <- apply(results_matrix,2,as.character)  
+
+write.csv(results_matrix, 
+          paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/",final_file,".csv",sep=""))
+
+
+
+```
+
+d13C signatures
+```{r}
+#change accordingly for each parameter of interest
+initial_parameter = "alg_d13C"
+parameter = "d13C"
+final_file = "alg_d13C_AllSites"
+
+
+#bring sites from the sties_list.csv file 
+sites = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/sites_list.csv",header =F)
+sites = as.list(sites[,1])
+
+results_matrix = as.data.frame(matrix(nrow = 0 , ncol = 4))    
+colnames(results_matrix) = c("algalSampleType","collectDate",print(parameter),"site")
+
+
+for (i in 1:length(sites)) {
+
+site = sites[i]
+ 
+
+alg_par = read.csv(paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/",site,"/04_product/",initial_parameter,".csv",sep=""))
+
+Csummary = alg_par %>%
+  group_by(algalSampleType,collectDate) %>%
+  summarise(parameter = (mean(algalConc, na.rm=T))/1000, par_SEM = ((sd(algalConc, na.rm=T))/1000)/sqrt(n())) %>%
+  mutate(site = print(site)) #note this should leave the units in "per million"  instead of permil, leave it as is to double check the code works for the other analytes and change it latter
+
+Csummary = as.data.frame(Csummary)
+colnames(Csummary) = c("algalSampleType","collectDate",print(parameter),"par_SEM","site")
+results_matrix = rbind(results_matrix,Csummary)
+
+}
+
+results_matrix <- apply(results_matrix,2,as.character)  
+
+write.csv(results_matrix, 
+          paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/",final_file,".csv",sep=""))
+
+
+
+
+```
+
+d15N signatures
+```{r}
+#change accordingly for each parameter of interest
+initial_parameter = "alg_d15N"
+parameter = "d15N"
+final_file = "alg_d15N_AllSites"
+
+
+#bring sites from the sties_list.csv file 
+sites = read.csv("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/sites_list.csv",header =F)
+sites = as.list(sites[,1])
+
+results_matrix = as.data.frame(matrix(nrow = 0 , ncol = 4))    
+colnames(results_matrix) = c("algalSampleType","collectDate",print(parameter),"site")
+
+
+for (i in 1:length(sites)) {
+
+site = sites[i]
+ 
+
+alg_par = read.csv(paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/NEONData/",site,"/04_product/",initial_parameter,".csv",sep=""))
+
+Csummary = alg_par %>%
+  group_by(algalSampleType,collectDate) %>%
+  summarise(parameter = (mean(algalConc, na.rm=T))/1000, par_SEM = ((sd(algalConc, na.rm=T))/1000)/sqrt(n())) %>%
+  mutate(site = print(site))  #note this should leave the units in "per million"  instead of permil, leave it as is to double check the code works for the other analytes and change it latter
+
+Csummary = as.data.frame(Csummary)
+colnames(Csummary) = c("algalSampleType","collectDate",print(parameter),"par_SEM","site")
+results_matrix = rbind(results_matrix,Csummary)
+
+}
+
+results_matrix <- apply(results_matrix,2,as.character)  
+
+write.csv(results_matrix, 
+          paste("/Volumes/Research/EcosystemEcologyLab/MSAPLANKTONdataDirectory/DataInDevelopment/Aggregations/AggregatedNEONdata/01_input/",final_file,".csv",sep=""))
+
+
+
+
+```
+
+
+
